@@ -1,0 +1,21 @@
+{
+  "name": "telegram-uploader",
+  "version": "0.0.1",
+  "description": "Uploads to telegram from watching a folder",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "telegram-uploader"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "config": "^3.3.9",
+    "fsmonitor": "^0.2.4",
+    "node-telegram-bot-api": "^0.64.0",
+    "winston": "^3.11.0"
+  }
+}

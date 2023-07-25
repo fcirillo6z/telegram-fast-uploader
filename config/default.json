@@ -1,0 +1,7 @@
+{
+  "bot-token": "",
+  "chatId": 0,
+  "watchFolder": "./watchfolder",
+  "convertedFolder": "./converted",
+  "loglevel": "debug"
+}
