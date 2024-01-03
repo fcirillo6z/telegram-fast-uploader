@@ -3,9 +3,6 @@ const fsmonitor = require('fsmonitor')
 const config = require('config')
 const logger = require('./modules/Logging');
 
-// fix deprecation message
-process.env["NTBA_FIX_350"] = 1;
-
 const token = config.get('bot-token');
 const chatId = config.get('chatId');
 const monitoredFolder = config.get('watchFolder');
