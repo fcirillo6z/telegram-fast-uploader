@@ -1,5 +1,5 @@
 const fs = require('fs/promises')
-const watch = require('node-watch');
+const chokidar = require('chokidar');
 const config = require('config')
 const logger = require('./modules/Logging');
 const pm = require('picomatch');
@@ -55,7 +55,7 @@ function convertDAVtoMP4(davFile) {
     });
 
 
-    const command = `ffmpeg -i ${davFilePath} -vf "scale=iw/2:ih/2" -vcodec libx264 -t ${config.has('videoduration') ? config.get('videoduration') :15} -crf 23 -preset ultrafast ${mp4FilePath}`;
+    const command = `ffmpeg -i ${davFilePath} -vf "scale=iw/2:ih/2" -vcodec libx264 -t ${config.has('videoduration') ? config.get('videoduration') : 15} -crf 23 -preset ultrafast ${mp4FilePath}`;
 
     exec(command, (error) => {
       if (error) {
@@ -69,24 +69,33 @@ function convertDAVtoMP4(davFile) {
   });
 }
 
-watch(monitoredFolder, {
-  recursive: true,
-  filter(f, skip) {
-    logger.info(`Check if file filtered: ${f}`)
-    if (pm('*.dav')(f)) return true;
-    if (pm('*.jpeg')(f)) return true;
-    if (pm('*.jpg')(f)) return true;
-    if (pm('*.mp4')(f)) return true;
-    return skip;
-  }
-},
-  async function (evt, name) {
-    logger.info(`Handling file: ${name}`)
-    if (evt == 'update') {
-      await handleFileName(name);
-    }
-  }
-);
+// watch(monitoredFolder, {
+//   recursive: true,
+//   filter(f, skip) {
+//     logger.info(`Check if file filtered: ${f}`)
+//     if (pm('*.dav')(f)) return true;
+//     if (pm('*.jpeg')(f)) return true;
+//     if (pm('*.jpg')(f)) return true;
+//     if (pm('*.mp4')(f)) return true;
+//     return skip;
+//   }
+// },
+//   async function (evt, name) {
+//     logger.info(`Handling file: ${name}`)
+//     if (evt == 'update') {
+//       await handleFileName(name);
+//     }
+//   }
+// );
+
+chokidar.watch(monitoredFolder, {
+  ignored: /(^|[\/\\])\../, // ignore dotfiles
+  persistent: true,
+  ignoreInitial: true,
+  usePolling: false,
+}).on('add', async (file) => {
+  await handleFileName(file);
+});
 
 async function handleFileName(file) {
   const isDav = pm('*.dav');
@@ -141,7 +150,7 @@ function getConverted() {
 }
 
 process.on('uncaughtException', (error) => {
-  logger.error('FATAL: ', error.stack);
+  logger.error('FATAL: ', error);
 });
 
 logger.info('Started watching folder.')
