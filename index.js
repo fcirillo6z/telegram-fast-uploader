@@ -58,7 +58,7 @@ function convertDAVtoMP4(davFile) {
 
     exec(command, (error) => {
       if (error) {
-        console.error(`Errore durante la conversione del file: ${error}`);
+        logger.error(`Errore durante la conversione del file: ${error}`);
         reject(error);
       } else {
         logger.debug(`File convertito con successo in: ${mp4FilePath}`);
@@ -139,4 +139,5 @@ function getConverted(file) {
 
 process.on('uncaughtException', (error) => {
   logger.error('FATAL: ', error.stack);
+  process.exit(1);
 });
