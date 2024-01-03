@@ -26,9 +26,9 @@ class Logger {
             winston.format.colorize({ all: true })
           )
         }),
-        ...(fileLogger ? {
+        ...(fileLogger ? [
           fileLogger
-        } : {})
+        ] : [])
       ]
     });
   }
