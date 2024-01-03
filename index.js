@@ -34,10 +34,10 @@ const sendMessage = async function (bot, body, files) {
         })
       }
     } catch (err) {
-      console.err('Telegram Error', err)
+      logger.error('Telegram Error', err)
     }
   } else {
-    console.err('Telegram Error')
+    logger.error('Telegram Error')
   }
 }
 
