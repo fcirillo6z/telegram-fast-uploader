@@ -2,7 +2,7 @@ const fs = require('fs/promises')
 const chokidar = require('chokidar');
 const config = require('config')
 const logger = require('./modules/Logging');
-const pm = require('picomatch');
+const anymatch = require('anymatch');
 const token = config.get('bot-token');
 const chatId = config.get('chatId');
 const monitoredFolder = config.get('watchFolder');
@@ -69,42 +69,31 @@ function convertDAVtoMP4(davFile) {
   });
 }
 
-// watch(monitoredFolder, {
-//   recursive: true,
-//   filter(f, skip) {
-//     logger.info(`Check if file filtered: ${f}`)
-//     if (pm('*.dav')(f)) return true;
-//     if (pm('*.jpeg')(f)) return true;
-//     if (pm('*.jpg')(f)) return true;
-//     if (pm('*.mp4')(f)) return true;
-//     return skip;
-//   }
-// },
-//   async function (evt, name) {
-//     logger.info(`Handling file: ${name}`)
-//     if (evt == 'update') {
-//       await handleFileName(name);
-//     }
-//   }
-// );
+
+const davPattern = '**/*.dav';
+const jpgPattern = '**/*.jpg';
+const jpegPattern = '**/*.jpeg';
 
 chokidar.watch(monitoredFolder, {
-  ignored: /(^|[\/\\])\../, // ignore dotfiles
+  // ignored: (string) => !anymatch([davPattern, jpgPattern, jpegPattern], string),
   persistent: true,
   ignoreInitial: true,
   usePolling: false,
+  awaitWriteFinish: {
+    stabilityThreshold: 1000,
+    pollInterval: 100
+  },
 }).on('add', async (file) => {
   await handleFileName(file);
 });
 
 async function handleFileName(file) {
-  const isDav = pm('*.dav');
-  const isJpg = pm('*.jpg');
   const foundFile = file;
   let convertedFilePath;
+  let deleteFlag = false;
   try {
     const bot = new TelegramBot(token, { polling: false });
-    if (isJpg(file)) {
+    if (anymatch(jpgPattern, file)) {
       const buffer = await fs.readFile(foundFile);
       await sendMessage(bot, {
         title: 'Uploading image.',
@@ -116,7 +105,7 @@ async function handleFileName(file) {
           name: file + '.jpg'
         }
       ]);
-    } else if (isDav(file)) {
+    } else if (anymatch(davPattern, file)) {
       logger.debug(`Uploading to bot ${foundFile}`);
       convertedFilePath = await convertDAVtoMP4(file);
 
@@ -135,10 +124,12 @@ async function handleFileName(file) {
       if (convertedFilePath) {
         await fs.unlink(convertedFilePath);
       }
+      deleteFlag = true;
     }
-    logger.debug(`Deleting ${foundFile}`);
-    await fs.unlink(foundFile);
-
+    if (deleteFlag) {
+      logger.debug(`Deleting ${foundFile}`);
+      await fs.unlink(foundFile);
+    }
   } catch (error) {
     logger.error(`Telegram-uploader-error: ${foundFile}`, error);
   }
