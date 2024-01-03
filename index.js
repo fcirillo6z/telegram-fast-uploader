@@ -55,7 +55,7 @@ function convertDAVtoMP4(davFile) {
     });
 
 
-    const command = `ffmpeg -i ${davFilePath} -vf "scale=iw/2:ih/2" -vcodec libx264 -t ${config.has('videoduration') ? config.get('videoduration') : 15} -crf 23 -preset ultrafast ${mp4FilePath}`;
+    const command = `ffmpeg -i ${davFilePath} -vf "scale=iw/2:ih/2" -vcodec libx264 -t ${config.has('videoduration') ? config.get('videoduration') : 15} -crf 27 -preset veryfast ${mp4FilePath}`;
 
     exec(command, (error) => {
       if (error) {
@@ -88,13 +88,12 @@ chokidar.watch(monitoredFolder, {
 });
 
 async function handleFileName(file) {
-  const foundFile = file;
   let convertedFilePath;
   let deleteFlag = false;
   try {
     const bot = new TelegramBot(token, { polling: false });
     if (anymatch(jpgPattern, file)) {
-      const buffer = await fs.readFile(foundFile);
+      const buffer = await fs.readFile(file);
       await sendMessage(bot, {
         title: 'Uploading image.',
         description: `Uploaded image ${file}`,
@@ -102,11 +101,11 @@ async function handleFileName(file) {
         {
           type: 'photo',
           attachment: buffer,
-          name: file + '.jpg'
+          name: file
         }
       ]);
     } else if (anymatch(davPattern, file)) {
-      logger.debug(`Uploading to bot ${foundFile}`);
+      logger.debug(`Uploading to bot ${file}`);
       convertedFilePath = await convertDAVtoMP4(file);
 
       const convertedBuffer = await fs.readFile(convertedFilePath);
@@ -127,11 +126,11 @@ async function handleFileName(file) {
       deleteFlag = true;
     }
     if (deleteFlag) {
-      logger.debug(`Deleting ${foundFile}`);
-      await fs.unlink(foundFile);
+      logger.debug(`Deleting ${file}`);
+      await fs.unlink(file);
     }
   } catch (error) {
-    logger.error(`Telegram-uploader-error: ${foundFile}`, error);
+    logger.error(`Telegram-uploader-error: ${file}`, error);
   }
 }
 
