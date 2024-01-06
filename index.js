@@ -14,14 +14,14 @@ const path = require('path');
 const readline = require('readline');
 const TelegramBot = require('node-telegram-bot-api');
 
-const sendMessage = async function (bot, body, files) {
+const sendTelegram = async function (bot, body, files) {
   if (!bot) {
     logger.debug('bot non trovato')
     return
   }
   if (bot && bot.sendMessage) {
     try {
-      await bot.sendMessage(chatId, `${body.title}${body.description ? '\n' + body.description : ''}`)
+      await sendMessage(bot, body);
       if (files) {
         files.forEach(async (file) => {
           switch (file.type) {
@@ -42,6 +42,10 @@ const sendMessage = async function (bot, body, files) {
   } else {
     logger.error('Telegram Error')
   }
+}
+
+async function sendMessage(bot, body) {
+  await bot.sendMessage(chatId, `${body.title}${body.description ? '\n' + body.description : ''}`);
 }
 
 function convertDAVtoMP4(davFile) {
@@ -96,23 +100,33 @@ async function handleFileName(file) {
       logger.debug(`Preparing to send image: ${file}`)
       const buffer = await fsProm.readFile(file);
       logger.debug(`Image size: ${buffer.byteLength} bytes`)
-      await sendMessage(bot, {
+      await sendTelegram(bot, {
         title: 'Uploading image.',
         description: `Uploaded image ${file}`,
       }, [
         {
           type: 'photo',
           attachment: buffer,
-          name: file
+          name: path.parse(file).base
         }
       ]);
       logger.debug(`Image sent: ${buffer.byteLength} bytes`)
+    } else if (anymatch(idxPattern, file)) {
+      const eventInfo = await readEventInfoFromFile(idx);
+      if (eventInfo) {
+        logger.debug(`Converting dav file: ${file}`);
+
+        try {
+          await sendMessage(bot, {
+            title: `Event`,
+            description: `Event of type: ${eventInfo.Name ?? 'Motion'}`,
+          });
+        } catch {
+          logger.error('Telegram Error', err)
+        }
+      }
     } else if (anymatch(davPattern, file)) {
       logger.debug(`Dav file found: ${file}`)
-
-      // read event info
-      const idx = findFileWithSameName(file, '.idx');
-      const eventInfo = await readEventInfoFromFile(idx);
 
       // convert dav file
       logger.debug(`Converting dav file: ${file}`);
@@ -122,14 +136,11 @@ async function handleFileName(file) {
       const convertedBuffer = await fsProm.readFile(convertedFilePath);
       if (convertedBuffer.byteLength) {
         logger.debug(`Mp4 file read with size: ${convertedBuffer.byteLength}`);
-        await sendMessage(bot, {
-          title: `Video Event`,
-          description: `Event of type: ${eventInfo.Name ?? 'Motion'}`,
-        }, [
+        await sendTelegram(bot, undefined, [
           {
             type: 'video',
             attachment: convertedBuffer,
-            name: convertedFilePath
+            name: path.parse(convertedFilePath).base
           }
         ]);
         if (convertedFilePath) {
