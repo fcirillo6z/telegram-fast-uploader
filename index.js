@@ -1,4 +1,6 @@
-const fs = require('fs/promises')
+process.env.NTBA_FIX_319 = 1
+const fsProm = require('node:fs/promises');
+const fs = require('node:fs');
 const chokidar = require('chokidar');
 const config = require('config')
 const logger = require('./modules/Logging');
@@ -9,9 +11,9 @@ const monitoredFolder = config.get('watchFolder');
 const convertedFolder = config.get('convertedFolder') ?? monitoredFolder;
 const { exec } = require('child_process');
 const path = require('path');
+const readline = require('readline');
 const TelegramBot = require('node-telegram-bot-api');
 
-process.env["NTBA_FIX_319"] = 1
 const sendMessage = async function (bot, body, files) {
   if (!bot) {
     logger.debug('bot non trovato')
@@ -43,9 +45,7 @@ const sendMessage = async function (bot, body, files) {
 }
 
 function convertDAVtoMP4(davFile) {
-  const davFilePath = davFile;
-
-  const mp4FileBase = getConverted(davFile);
+  const mp4FileBase = getConverted();
 
   return new Promise((resolve, reject) => {
     const mp4FilePath = path.format({
@@ -55,7 +55,7 @@ function convertDAVtoMP4(davFile) {
     });
 
 
-    const command = `ffmpeg -i ${davFilePath} -vf "scale=iw/2:ih/2" -vcodec libx264 -t ${config.has('videoduration') ? config.get('videoduration') : 15} -crf 27 -preset veryfast ${mp4FilePath}`;
+    const command = `ffmpeg -i ${davFile} -vf "scale=iw/2:ih/2" -vcodec libx264 -t ${config.has('videoduration') ? config.get('videoduration') : 15} -crf 27 -preset veryfast ${mp4FilePath}`;
 
     exec(command, (error) => {
       if (error) {
@@ -70,9 +70,9 @@ function convertDAVtoMP4(davFile) {
 }
 
 
+const idxPattern = '**/*.idx';
 const davPattern = '**/*.dav';
 const jpgPattern = '**/*.jpg';
-const jpegPattern = '**/*.jpeg';
 
 chokidar.watch(monitoredFolder, {
   // ignored: (string) => !anymatch([davPattern, jpgPattern, jpegPattern], string),
@@ -84,7 +84,7 @@ chokidar.watch(monitoredFolder, {
     pollInterval: 100
   },
 }).on('add', async (file) => {
-  await handleFileName(file);
+  handleFileName(path.normalize(file));
 });
 
 async function handleFileName(file) {
@@ -94,7 +94,7 @@ async function handleFileName(file) {
     const bot = new TelegramBot(token, { polling: false });
     if (anymatch(jpgPattern, file)) {
       logger.debug(`Preparing to send image: ${file}`)
-      const buffer = await fs.readFile(file);
+      const buffer = await fsProm.readFile(file);
       logger.debug(`Image size: ${buffer.byteLength} bytes`)
       await sendMessage(bot, {
         title: 'Uploading image.',
@@ -108,31 +108,40 @@ async function handleFileName(file) {
       ]);
       logger.debug(`Image sent: ${buffer.byteLength} bytes`)
     } else if (anymatch(davPattern, file)) {
+      logger.debug(`Dav file found: ${file}`)
+
+      // read event info
+      const idx = findFileWithSameName(file, '.idx');
+      const eventInfo = await readEventInfoFromFile(idx);
+
+      // convert dav file
       logger.debug(`Converting dav file: ${file}`);
       convertedFilePath = await convertDAVtoMP4(file);
-      logger.debug(`Converted mp4 file: ${file}`);
-      const convertedBuffer = await fs.readFile(convertedFilePath);
-      logger.debug(`Mp4 file read with size: ${convertedBuffer.byteLength}`);
-      await sendMessage(bot, {
-        title: 'Uploading video.',
-        description: `Uploaded file ${convertedFilePath}`,
-      }, [
-        {
-          type: 'video',
-          attachment: convertedBuffer,
-          name: convertedFilePath
+      logger.debug(`Converted mp4 file: ${convertedFilePath}`);
+
+      const convertedBuffer = await fsProm.readFile(convertedFilePath);
+      if (convertedBuffer.byteLength) {
+        logger.debug(`Mp4 file read with size: ${convertedBuffer.byteLength}`);
+        await sendMessage(bot, {
+          title: `Video Event`,
+          description: `Event of type: ${eventInfo.Name ?? 'Motion'}`,
+        }, [
+          {
+            type: 'video',
+            attachment: convertedBuffer,
+            name: convertedFilePath
+          }
+        ]);
+        if (convertedFilePath) {
+          await fsProm.unlink(convertedFilePath);
+          logger.debug(`Deleted mp4 file at :${convertedFilePath}`);
         }
-      ]);
-      logger.debug(`Sent mp4 file: ${convertedBuffer.byteLength}`);
-      if (convertedFilePath) {
-        await fs.unlink(convertedFilePath);
-        logger.debug(`Deleted mp4 file at :${convertedFilePath}`);
       }
       deleteFlag = true;
     }
     if (deleteFlag) {
       logger.debug(`Deleting original file at: ${file}`);
-      await fs.unlink(file);
+      await fsProm.unlink(file);
     }
   } catch (error) {
     logger.error(`Telegram-uploader-error: ${file}`, error);
@@ -150,3 +159,29 @@ process.on('uncaughtException', (error) => {
 
 logger.info('Started watching folder.')
 logger.info(`Watchfolder: ${monitoredFolder}`)
+
+async function readEventInfoFromFile(file) {
+  logger.debug(`Reading idx file: ${file}`)
+
+  const fileStream = fs.createReadStream(file);
+  if (fileStream) {
+    const rl = readline.createInterface({
+      input: fileStream,
+    });
+    for await (const line of rl) {
+      if (line.startsWith('Event=')) {
+        const eventRaw = line.substring(6);
+        return JSON.parse(eventRaw);
+      }
+    }
+  }
+}
+
+function findFileWithSameName(idxFile, extension) {
+  const idxPath = path.parse(idxFile);
+  return path.format({
+    dir: idxPath.dir,
+    name: idxPath.name,
+    ext: extension
+  })
+}
