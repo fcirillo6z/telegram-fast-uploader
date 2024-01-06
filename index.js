@@ -93,7 +93,9 @@ async function handleFileName(file) {
   try {
     const bot = new TelegramBot(token, { polling: false });
     if (anymatch(jpgPattern, file)) {
+      logger.debug(`Preparing to send image: ${file}`)
       const buffer = await fs.readFile(file);
+      logger.debug(`Image size: ${buffer.byteLength} bytes`)
       await sendMessage(bot, {
         title: 'Uploading image.',
         description: `Uploaded image ${file}`,
@@ -104,12 +106,13 @@ async function handleFileName(file) {
           name: file
         }
       ]);
+      logger.debug(`Image sent: ${buffer.byteLength} bytes`)
     } else if (anymatch(davPattern, file)) {
-      logger.debug(`Uploading to bot ${file}`);
+      logger.debug(`Converting dav file: ${file}`);
       convertedFilePath = await convertDAVtoMP4(file);
-
+      logger.debug(`Converted mp4 file: ${file}`);
       const convertedBuffer = await fs.readFile(convertedFilePath);
-
+      logger.debug(`Mp4 file read with size: ${convertedBuffer.byteLength}`);
       await sendMessage(bot, {
         title: 'Uploading video.',
         description: `Uploaded file ${convertedFilePath}`,
@@ -120,13 +123,15 @@ async function handleFileName(file) {
           name: convertedFilePath
         }
       ]);
+      logger.debug(`Sent mp4 file: ${convertedBuffer.byteLength}`);
       if (convertedFilePath) {
         await fs.unlink(convertedFilePath);
+        logger.debug(`Deleted mp4 file at :${convertedFilePath}`);
       }
       deleteFlag = true;
     }
     if (deleteFlag) {
-      logger.debug(`Deleting ${file}`);
+      logger.debug(`Deleting original file at: ${file}`);
       await fs.unlink(file);
     }
   } catch (error) {
