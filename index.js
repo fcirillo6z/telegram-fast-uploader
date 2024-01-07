@@ -5,14 +5,15 @@ const chokidar = require('chokidar');
 const config = require('config')
 const logger = require('./modules/Logging');
 const anymatch = require('anymatch');
-const token = config.get('bot-token');
-const chatId = config.get('chatId');
-const monitoredFolder = config.get('watchFolder');
-const convertedFolder = config.get('convertedFolder') ?? monitoredFolder;
 const { exec } = require('child_process');
 const path = require('path');
 const readline = require('readline');
 const TelegramBot = require('node-telegram-bot-api');
+
+const token = config.get('bot-token');
+const chatId = config.get('chatId');
+const monitoredFolder = config.get('watchFolder');
+const convertedFolder = config.get('convertedFolder') ?? monitoredFolder;
 
 const sendTelegram = async function (bot, body, files) {
   if (!bot) {
