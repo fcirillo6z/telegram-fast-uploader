@@ -22,7 +22,9 @@ const sendTelegram = async function (bot, body, files) {
   }
   if (bot && bot.sendMessage) {
     try {
-      await sendMessage(bot, body)
+      if (body) {
+        await sendMessage(bot, body)
+      }
       if (files) {
         files.forEach(async (file) => {
           switch (file.type) {
