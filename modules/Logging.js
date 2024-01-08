@@ -1,21 +1,21 @@
-const winston = require('winston');
-const config = require('config');
+const winston = require('winston')
+const config = require('config')
 
 class Logger {
-  constructor() {
-    let fileLogger;
-    if (config.has("errorlogfile")) {
+  constructor () {
+    let fileLogger
+    if (config.has('errorlogfile')) {
       fileLogger = new winston.transports.File({
-        filename: config.get("errorlogfile"),
+        filename: config.get('errorlogfile'),
         level: 'error',
         format: winston.format.printf(
           info => `[${new Date().toLocaleString()}] ${info.level.toLocaleUpperCase()}: ${info.message}`
         )
-      });
+      })
     }
 
     this.logger = winston.createLogger({
-      level: config.get("loglevel"),
+      level: config.get('loglevel'),
       transports: [
         new winston.transports.Console({
           format: winston.format.combine(
@@ -26,11 +26,13 @@ class Logger {
             winston.format.colorize({ all: true })
           )
         }),
-        ...(fileLogger ? [
-          fileLogger
-        ] : [])
+        ...(fileLogger
+          ? [
+              fileLogger
+            ]
+          : [])
       ]
-    });
+    })
   }
 }
 module.exports = new Logger().logger
