@@ -132,23 +132,23 @@ async function handleFileName(file) {
 
       let eventInfo
       try {
-        // idx file may not be created yet, so retry 3 times
-        eventInfo = await retry(() => readEventInfoFromFile(idxFile), 3)
+        // idx file may not be created yet, so retry 5 times
+        eventInfo = await retry(() => readEventInfoFromFile(idxFile), 5, 50)
       } catch (error) {
         logger.debug(`No event file found. [${error}] for file: ${path.parse(file).base}`)
       }
       if (eventInfo) {
-        if (!ignoredEvents.includes(eventInfo.Name)) {
+        if (!ignoredEvents || !(ignoredEvents?.length) || !ignoredEvents.includes(eventInfo.Name)) {
           if (debouncedEvents.includes(eventInfo.Name)) {
             if (_debouncedInner.includes(eventInfo.Name)) {
               logger.debug(`Event debounced, timeout not passed: ${eventInfo.Name}`)
             } else {
+              await handleDavFile(file, convertedFilePath, bot)
               _debouncedInner.push(eventInfo.Name)
               setTimeout(() => {
                 _debouncedInner = [..._debouncedInner.filter((name) => name !== eventInfo.Name)]
               }, debounceInMin * 60000)
             }
-            await handleDavFile(file, convertedFilePath, bot)
           } else {
             await handleDavFile(file, convertedFilePath, bot)
           }
@@ -228,18 +228,19 @@ function findFileWithSameName(file, extension) {
     ext: extension
   })
 }
-
-function retry(operationPromise, maxAttempts) {
+function retry(operation, maxAttempts, delay) {
   return new Promise((resolve, reject) => {
-    return operationPromise()
+    return operation()
       .then(resolve)
       .catch((reason) => {
         if (maxAttempts <= 0) {
           reject(reason)
         } else {
-          retry(operationPromise, maxAttempts - 1)
-            .then(resolve)
-            .catch(reject)
+          setTimeout(() => {
+            retry(operation, maxAttempts - 1, delay)
+              .then(resolve)
+              .catch(reject)
+          }, delay)
         }
       })
   })
