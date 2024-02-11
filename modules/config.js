@@ -12,7 +12,7 @@ const ignoredEvents = config.has('ignoredEvents') ? splitArray(config.get('ignor
 const videoduration = config.has('videoduration') ? config.get('videoduration') : 15
 
 function splitArray(csv) {
-  if (!csv || !csv.length) {
+  if (!csv || !csv.length || typeof csv !== 'string') {
     return []
   }
   return csv.trim().split(',').map(element => element.trim())
