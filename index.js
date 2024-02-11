@@ -74,7 +74,7 @@ function convertDAVtoMP4(davFile) {
   })
 }
 
-const idxPattern = '**/*.idx'
+// const idxPattern = '**/*.idx'
 const davPattern = '**/*.dav'
 const jpgPattern = '**/*.jpg'
 
@@ -110,20 +110,28 @@ async function handleFileName(file) {
         }
       ])
       logger.debug(`Image sent: ${buffer.byteLength} bytes`)
-    } else if (anymatch(idxPattern, file)) {
-      const eventInfo = await readEventInfoFromFile(file)
-      if (eventInfo && !ignoredEvents.includes(eventInfo.Name) && !_debouncedInner.includes(eventInfo.Name)) {
-        try {
-          await sendMessage(bot, {
-            title: 'Event',
-            description: `Event of type: ${eventInfo.Name ?? 'Motion'}`
-          })
-        } catch (err) {
-          logger.error('Telegram Error', err)
-        }
-      } else {
-        logger.debug(`File ignored or unread: ${file}. ${eventInfo?.Name ? `Type: ${eventInfo.Name}` : ''}`)
-      }
+    // } else if (anymatch(idxPattern, file)) {
+    //   const eventInfo = await readEventInfoFromFile(file)
+    //   if (eventInfo && (eventInfo.Name?.length > 0 && !ignoredEvents.includes(eventInfo.Name) && !_debouncedInner.includes(eventInfo.Name))) {
+    //     try {
+    //       await sendMessage(bot, {
+    //         title: 'Event',
+    //         description: `Event of type: ${eventInfo.Name ?? 'Motion'}`
+    //       })
+    //     } catch (err) {
+    //       logger.error('Telegram Error', err)
+    //     }
+    //   } else {
+    //     if (!(eventInfo?.Name) || eventInfo?.Name?.length === 0) {
+    //       logger.debug(`File ignored : ${file}. Event name not read correctly`)
+    //     }
+    //     if (ignoredEvents.includes(eventInfo.Name)) {
+    //       logger.debug(`File ignored : ${file}. ${eventInfo?.Name ? `Type: ${eventInfo.Name}` : ''}`)
+    //     }
+    //     if (_debouncedInner.includes(eventInfo.Name)) {
+    //       logger.debug(`File ignored for not enough time passed between similar events : ${file}. ${eventInfo?.Name ? `Type: ${eventInfo.Name}` : ''}`)
+    //     }
+    //   }
     } else if (anymatch(davPattern, file)) {
       logger.debug(`Dav file found: ${path.parse(file).base}`)
 
@@ -141,8 +149,16 @@ async function handleFileName(file) {
         if (!ignoredEvents || !(ignoredEvents?.length) || !ignoredEvents.includes(eventInfo.Name)) {
           if (debouncedEvents.includes(eventInfo.Name)) {
             if (_debouncedInner.includes(eventInfo.Name)) {
-              logger.debug(`Event debounced, timeout not passed: ${eventInfo.Name}`)
+              logger.debug(`File ignored for not enough time passed between similar events : ${file}. ${eventInfo?.Name ? `Type: ${eventInfo.Name}` : ''}`)
             } else {
+              try {
+                await sendMessage(bot, {
+                  title: 'Event',
+                  description: `Event of type: ${eventInfo.Name ?? 'Motion'}`
+                })
+              } catch (err) {
+                logger.error('Telegram Error', err)
+              }
               await handleDavFile(file, convertedFilePath, bot)
               _debouncedInner.push(eventInfo.Name)
               setTimeout(() => {
@@ -151,6 +167,10 @@ async function handleFileName(file) {
             }
           } else {
             await handleDavFile(file, convertedFilePath, bot)
+          }
+        } else {
+          if (ignoredEvents?.length && ignoredEvents.includes(eventInfo.Name)) {
+            logger.debug(`File ignored : ${file}. ${eventInfo?.Name ? `Type: ${eventInfo.Name}` : ''}`)
           }
         }
       }
